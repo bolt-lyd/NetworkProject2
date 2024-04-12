@@ -1,6 +1,9 @@
 import socket
 import threading
 
+# Define host IP and port
+HOST = '127.0.0.1'
+PORT = 12345
 
 # send messages
 def send_message(client_socket):
@@ -21,10 +24,10 @@ def receive_message(client_socket):
 
 #start client
 def start_client():
-    server_address = input("Enter server address: ")
-    server_port = int(input("Enter server port: "))
+    # HOST = input("Enter server address: ")
+    # PORT = int(input("Enter server port: "))
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    client_socket.connect((server_address, server_port))
+    client_socket.connect((HOST, PORT))
 
     send = threading.Thread(target=send_message, args=(client_socket,))
     receive = threading.Thread(target=receive_message, args=(client_socket,))
