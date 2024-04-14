@@ -14,74 +14,78 @@ PORT = 12345
 #Help Menu
 help_menu = '''
 Commands:
-- JOIN:
+==JOIN==
 Join the message board and assign your username.
 Example: JOIN;username
 
-- POST:
+==POST==
 Post to the message board.
 Example: POST;Post Subject;Post body.
 
-- USERS:
+==USERS==
 Returns list of users in the message board.
 Example: USERS
 
-- MESSAGE:
+==MESSAGE==
 Gets the Post body of the requested post.
 Example: MESSAGE;Id
 
-- LEAVE:
+==LEAVE==
 Leaves the given group.
 Example: LEAVE
 
-- GROUPS:
+==GROUPS==
 Retrieve a list of all groups that can be joined.
 Example: GROUPS
 
-- GROUPJOIN:
+==GROUPJOIN==
 Join a specific group by name.
 Example: GROUPJOIN;group_name
 
-- GROUPPOST:
+==GROUPPOST==
 Post a message to a specific group's message board.
 Example: GROUPPOST;group_name;post_subject;post_body.
 
-- GROUPUSERS:
+==GROUPUSERS==
 Retrieve a list of users in a specific group.
 Example: GROUPUSERS;group_name
 
-- GROUPMESSAGE:
+==GROUPMESSAGE==
 Retrieve the content of a message posted earlier in a specific group's message board.
 Example: GROUPMESSAGE;group_name;message_id
 
-- GROUPLEAVE:
+==GROUPLEAVE==
 Leave a specific group.
 Example: GROUPLEAVE;group_name
 
-- EXIT:
+==EXIT==
 Exit the server.
 Example: EXIT
 
-- HELP:
+==HELP==
 View this menu again at any time.
 Example: HELP
 '''
 
-
 # Dictionary for tacking client information
 client_info = {}
 '''
-client_info = {
-    'user1': {
-        'socket': client_socket1
-    },
-    'user2': {
-        'socket': client_socket2
-    },
-    ...
-}
+client_info = {'user': 'client'}
 '''
 posts = {}
+'''
+posts = {
+    id: {
+        'username': 'user',
+        'date': 'date time',
+        'subject': 'post subject',
+        'body': 'post body'
+    },
+    {
+        ...
+    }
+}
+'''
 
 # Dictionary for tracking posts in each group
 groups_posts = {'Group 1': {'posts': {}, 'users': []}, 'Group 2': {'posts': {}, 'users': []}, 'Group 3': {'posts': {}, 'users': []}, 'Group 4': {'posts': {}, 'users': []}, 'Group 5': {'posts': {}, 'users': []}}
@@ -101,7 +105,6 @@ groups_posts = {
 }
 '''
 
-
 post_id = 0
 username = None
 ################## /Initializations ##################
@@ -115,34 +118,44 @@ def handle_client(client_socket, client_address):
     global username
     while True:
         try:
+            #decode data from client
             data = client_socket.recv(1024).decode()
-            # if data.startswith('CONNECT'):
-            #     new_connection = data.split(';')
-            #     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            #     client_socket.connect((new_connection[1], new_connection[2]))
 
-            #tested;works
+            #get username being used by the client
+            username = get_username(client_socket)
+
+            #JOIN command
+            #JOIN;{username}
             if data.startswith('JOIN'):
                 username = data.split(';')[1]
+
+                #if someone on the server already has the username, the server will not allow the user to join
                 if username in client_info.keys():
                     client_socket.send("Username already exists. Please join with a new username.".encode("utf-8"))
                 else:
+                    #save client socket and username
                     client_info[username] = client_socket
-                    #client_socket.send(help_menu.encode())
+
+                    #send last two posts on server to new user
                     if len(posts) > 1:
                         post = posts[post_id - 1]
                         client_socket.send(f"{post_id - 1}, {post['username']}, {post['date']}, {post['subject']}".encode())
                     if len(posts) > 0:
                         post = posts[post_id]
                         client_socket.send(f"{post_id}, {post['username']}, {post['date']}, {post['subject']}".encode())
+
+                    #send message to everyone on the server that a new user has joined
                     message = f"{username} has joined the server"
                     broadcast(message)
 
-            #tested; works
+            #POST;{subject};{body}
             elif data.startswith('POST'):
+
+                #if user has not joined the server yet, they will be prompted to join the server first before any other commands can be made
                 if not username:
                     client_socket.send("Please join the server first.".encode("utf-8"))
                 else:
+                    #get new post id
                     post_id += 1
                     new_post = data.split(';')
                     post = f"{post_id}, {username}, {datetime.datetime.now().strftime('%m/%d/%Y %H:%M:%S')}, {new_post[1]}"
@@ -150,21 +163,26 @@ def handle_client(client_socket, client_address):
                                     'date': datetime.datetime.now().strftime('%m/%d/%Y %H:%M:%S'),
                                     'subject': new_post[1],
                                     'body': new_post[2]}
+                    #send new post to everyone on server
                     broadcast(post)
 
-            # tested; works
             # displays list of users currently in server group to the client
             elif data.startswith('USERS'):
+                #if user has not joined server yet, they will be prompted to do so before making any more requests
                 if not username:
                     client_socket.send("Please join the server first.".encode("utf-8"))
                 else:
+                    #get all of the usernames of the users currently on server
                     message = "Users in group: " + ", ".join(client_info.keys())
+                    #send the message to user that requested the information
                     client_socket.send(message.encode("utf-8"))
 
             # Removes client from the server and alerts other users
             elif data.startswith('LEAVE'):
+                #notify all users that a client has left the server
                 message = str(username) + " has left the server"
                 broadcast(message)
+                #delete client's information
                 del client_info[username]
                 break
 
@@ -180,8 +198,13 @@ def handle_client(client_socket, client_address):
 
             # Retrieves list of all available groups
             elif data.startswith('GROUPS'):
-                message = "Joinable Groups: " + ", ".join(groups_posts.keys())
-                client_socket.send(message.encode("utf-8"))
+                #if user has not joined server, they will be prompted to do so before making any other requests
+                if not username:
+                    client_socket.send("Please join the server first.".encode("utf-8"))
+                else:
+                    #get list of joinable groups and send to user that requested the information
+                    message = "Joinable Groups:\n" + "\n".join(groups_posts.keys())
+                    client_socket.send(message.encode("utf-8"))
 
             # Add client to specific group
             elif data.startswith('GROUPJOIN'):
@@ -210,7 +233,7 @@ def handle_client(client_socket, client_address):
                         last_post = group_posts[last_post_id]
                         client_socket.send(f"{last_post_id}, {last_post['username']}, {last_post['date']}, {last_post['subject']}".encode())
 
-                    message = f"\n{username} has joined the group {group_name}."
+                    message = f"\n{username} has joined {group_name}."
                     broadcast_group(message, group_name)
 
 
@@ -227,9 +250,8 @@ def handle_client(client_socket, client_address):
                                     'date': datetime.datetime.now().strftime('%m/%d/%Y %H:%M:%S'),
                                     'subject': group_data[2],
                                     'body': group_data[3]}
-                    #new function; broadcast to group?
+                    #send new post to all users in group
                     broadcast_group(post, group_data[1])
-
 
             elif data.startswith('GROUPUSERS'):
                 group_data = data.split(';')
@@ -290,32 +312,31 @@ def handle_client(client_socket, client_address):
         except Exception as e:
             print("Error:", e)
 
-# Send message to everyone
+# Send message to everyone on server
 def broadcast(message):
+    #for all client sockets
     for client_socket in client_info.values():
         try:
+            #send encoded message to all clients found in client_info
             client_socket.sendall(str(message).encode())
         except Exception as e:
             print("Error:", e)
 
-# send message to everyone in group
+# send message to everyone in a group given the message and group
 def broadcast_group(message, group):
+    #goes through each user in given group
     for user in groups_posts[group]['users']:
         try:
+            #sends encoded message to client if username is found in group
             client_info[user].send(message.encode())
         except Exception as e:
             print("Error: ", e)
 
-
-
-
-################## /Functions ##################
-
-
-
-
-
-################## Server connection ##################
+def get_username(client_socket):
+    for key, value in client_info.items():
+        if value == client_socket:
+            return key
+    return None  # If value is not found
 
 # Create a socket for server
 server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -324,11 +345,6 @@ server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server_socket.bind((HOST, PORT))
 server_socket.listen()
 print(f"Server listening on {HOST}:{PORT}")
-
-################## /Sever connection ##################
-
-
-
 
 try:
     while True:
