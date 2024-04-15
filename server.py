@@ -188,13 +188,18 @@ def handle_client(client_socket, client_address):
 
             # Retrieves content of message given the message ID
             elif data.startswith('MESSAGE'):
-                message = data.split(';')
-                try:
-                    post_info = posts[int(message[1])]
-                    post_message = f"Post ID: {message[1]}\nUsername: {post_info['username']}\nDate: {post_info['date']}\nSubject: {post_info['subject']}\nBody: {post_info['body']}"
-                    client_socket.send(post_message.encode())
-                except:
-                    client_socket.send("Post not found.".encode())
+
+                #if user has not joined server yet, they will be promted to do so before making any more requests
+                if not username:
+                    client_socket.send("Please join the server first.".encode("utf-8"))
+                else:
+                    message = data.split(';')
+                    try:
+                        post_info = posts[int(message[1])]
+                        post_message = f"Post ID: {message[1]}\nUsername: {post_info['username']}\nDate: {post_info['date']}\nSubject: {post_info['subject']}\nBody: {post_info['body']}"
+                        client_socket.send(post_message.encode())
+                    except:
+                        client_socket.send("Post not found.".encode())
 
             # Retrieves list of all available groups
             elif data.startswith('GROUPS'):
@@ -208,31 +213,32 @@ def handle_client(client_socket, client_address):
 
             # Add client to specific group
             elif data.startswith('GROUPJOIN'):
+                #get user data
                 group_data = data.split(';')
                 group_name = group_data[1]
-                # Check if valid group name
-                if not username:
-                    message = "Please join the group first."
-                    client_socket.send(message.encode())
-                else:
 
+                #check if client has joined the server yet
+                if not username:
+                    client_socket.send("Please join the server first.".encode("utf-8"))
+                else:
                     # Assign user to specified group
                     groups_posts[group_name]['users'].append(username)
                     group_posts = groups_posts[group_name]['posts']
                     post_keys = list(group_posts.keys())
 
                     if len(post_keys) > 1:
-                            # Get the second-to-last post
+                        # Get the second-to-last post sent in group
                         second_last_post_id = post_keys[-2]
                         second_last_post = group_posts[second_last_post_id]
                         client_socket.send(f"{second_last_post_id}, {second_last_post['username']}, {second_last_post['date']}, {second_last_post['subject']}".encode())
 
                     if len(post_keys) > 0:
-                            # Get the last post
+                        # Get the last post sent in group
                         last_post_id = post_keys[-1]
                         last_post = group_posts[last_post_id]
                         client_socket.send(f"{last_post_id}, {last_post['username']}, {last_post['date']}, {last_post['subject']}".encode())
 
+                    #notify users in group that a new user has joined
                     message = f"\n{username} has joined {group_name}."
                     broadcast_group(message, group_name)
 
@@ -240,10 +246,12 @@ def handle_client(client_socket, client_address):
             #GROUPOST;group name;subject;body
             elif data.startswith('GROUPPOST'):
                 group_data = data.split(';')
+                #if user is not in group, they must join group before trying to post in it
                 if username not in groups_posts[group_data[1]]['users']:
                     message = "Please join group first."
                     client_socket.send(message.encode())
                 else:
+                    #get new post id
                     post_id += 1
                     post = f"{post_id}, {username}, {datetime.datetime.now().strftime('%m/%d/%Y %H:%M:%S')}, {group_data[2]}"
                     groups_posts[group_data[1]]['posts'][post_id] = {'username': username,
@@ -256,22 +264,31 @@ def handle_client(client_socket, client_address):
             elif data.startswith('GROUPUSERS'):
                 group_data = data.split(';')
                 group_name = group_data[1]
+                #if user is not currently in group, they must join group before trying to get users
                 if username not in groups_posts[group_data[1]]['users']:
                     message = "Please join group first."
                     client_socket.send(message.encode())
                 else:
+                    #if user entered correct group name, a list of users will be retured to the user
                     if group_name in groups_posts:
                         users = ', '.join(groups_posts[group_name]['users'])
                         client_socket.send(f"Users in {group_name}: {users}".encode())
+
+                    #if user entered an invalid username, they will be told so
                     else:
                         client_socket.send(f"Group '{group_name}' not found.".encode())
 
+            #GROUPLEAVE
+            #removes user from group (but keeps them on the server)
             elif data.startswith('GROUPLEAVE'):
                 leave_data = data.split(';')
                 group_name = leave_data[1].strip()
                 if group_name in groups_posts:
                     if username in groups_posts[group_data[1]]['users']:
+                        #remove user from group
                         groups_posts[group_name]['users'].remove(username)
+
+                        #notify the rest of the users in the group that user has left
                         message = f"{username} has left group {group_name}"
                         broadcast_group(message, group_name)
                     else:
@@ -279,29 +296,35 @@ def handle_client(client_socket, client_address):
                 else:
                     client_socket.send(f"{group_name} does not exist.".encode())
 
+            #GROUPMESSAGE;{Group name};{message id}
             elif data.startswith('GROUPMESSAGE'):
                 message_data = data.split(';')
                 group_name = message_data[1]
                 message_id = message_data[2]
+
+                #if user not in group, they must join group before requesting message
                 if username not in groups_posts[group_name]['users']:
                     message = "Please join group first."
                     client_socket.send(message.encode())
                 else:
                     if group_name in groups_posts:
+                        #get post by message id
                         post_info = groups_posts[group_name]['posts'][int(message_id)]
+
+                        #send requested message to user
                         post_message = f"Post ID: {message_id}\nUsername: {post_info['username']}\nDate: {post_info['date']}\nSubject: {post_info['subject']}\nBody: {post_info['body']}"
 
                         client_socket.send(post_message.encode())
                     else:
                         client_socket.send(f"Group '{group_name}' not found.")
-            #tested; works
+            #EXIT
             # terminates client
             elif data.startswith('EXIT'):
                 client_socket.close()
                 print(f"{client_address} disconnected")
                 break
 
-            #tested; works
+            #HELP
             # prints help menu to the client
             elif data.startswith('HELP'):
                 client_socket.send(help_menu.encode())
@@ -340,8 +363,20 @@ def get_username(client_socket):
 
 # Create a socket for server
 server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-# HOST = input("Input server's host: ")
-# PORT = int(input("Input server's port: "))
+
+#prompts use to input server's host and port
+#defaults to localhost:12345
+host = input("Input server's host: ")
+port = input("Input server's port: ")
+
+#if host entered by user, set HOST
+if host:
+    HOST = host
+
+#if port entered by user, set PORT
+if port:
+    PORT = int(port)
+
 server_socket.bind((HOST, PORT))
 server_socket.listen()
 print(f"Server listening on {HOST}:{PORT}")

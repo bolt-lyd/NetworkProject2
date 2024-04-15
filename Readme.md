@@ -1,4 +1,7 @@
 # Socket Programming Bulletin Board
+### Authors
+Madison Barry, Kelly Deal, and Lydia Watchman
+
 ### How to run
 Before running this program for the first time, in the termninal run `make requirements` in the root directory to ensure that you have all of the required imports.
 
@@ -14,12 +17,10 @@ If done correctly, the client GUI will open in a new window.
 
 If there is no server running at that address, `client.py` will exit with error `ConnectionRefusedError: [WinError 10061] No connection could be made because the target machine actively refused it`.
 
+
 > [!NOTE]
 > When the client GUI starts, you will see `QObject::connect: Cannot queue arguments of type 'QTextCursor'
 (Make sure 'QTextCursor' is registered using qRegisterMetaType().)` in the terminal. This is not an error that effects the performance of the program, as far as has been observed.
 
 ### How to use
 When the client's GUI opens, it will display a welcome message, as well as a help menu with all of the available commands. To see this help menu again at any time, send "HELP" and the menu will display to the user again.
-
-### Authors
-Madison Barry, Kelly Deal, and Lydia Watchman

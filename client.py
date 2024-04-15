@@ -113,13 +113,26 @@ class ClientGUI(QWidget):
         receive_thread = threading.Thread(target=self.receive_message)
         receive_thread.start()
 
+#prompts use to input server's host and port
+#defaults to localhost:12345
+host = input("Input server's host: ")
+port = input("Input server's port: ")
+
+#if host entered by user, set HOST
+if host:
+    HOST = host
+
+#if port entered by user, set PORT
+if port:
+    PORT = int(port)
+
 #create PyQt appliation
 app = QApplication(sys.argv)
 #create new instance of client GUI
 client_gui = ClientGUI()
-#display GUI
-client_gui.show()
 #start client and connect to server
 client_gui.start_client(HOST, PORT)
+#display GUI
+client_gui.show()
 #run application on event loop
 sys.exit(app.exec_())
