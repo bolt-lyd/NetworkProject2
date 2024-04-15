@@ -1,5 +1,5 @@
 requirements:
-	pip install -r requirements.txt
+	pip install pyqt5
 
 run_server:
 	python3 server.py
